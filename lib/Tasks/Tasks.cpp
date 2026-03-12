@@ -36,10 +36,8 @@ bool Tasks::createAll()
     return (r1 == pdPASS && r2 == pdPASS && r3 == pdPASS);
 }
 
-// ============================================================
 //  Task 1: Sensor Acquisition (period: 50 ms)
 //  Reads NTC thermistor (every cycle) and DHT11 (every 2 s)
-// ============================================================
 void Tasks::acquisitionTask(void *pvParameters)
 {
     (void)pvParameters;
@@ -51,11 +49,11 @@ void Tasks::acquisitionTask(void *pvParameters)
 
     for (;;)
     {
-        // --- Analog sensor (NTC thermistor) - every cycle ---
+        // Analog sensor (NTC thermistor) - every cycle
         uint16_t raw  = SensorAnalog::readRaw();
         float    tempC = SensorAnalog::rawToCelsius(raw);
 
-        // --- Digital sensor (DHT11) - every ~2 s ---
+        // Digital sensor (DHT11) - every ~2s
         float dhtTemp = 0.0f, dhtHum = 0.0f;
         bool  dhtOk   = false;
 
@@ -65,7 +63,7 @@ void Tasks::acquisitionTask(void *pvParameters)
         }
         dhtCounter++;
 
-        // --- Update shared data (mutex-protected) ---
+        // Update shared data (mutex-protected)
         if (xSemaphoreTake(dataMutex, pdMS_TO_TICKS(10)) == pdTRUE)
         {
             sensorData.analogRaw  = raw;
@@ -84,10 +82,8 @@ void Tasks::acquisitionTask(void *pvParameters)
     }
 }
 
-// ============================================================
 //  Task 2: Threshold Alerting (period: 50 ms)
 //  Applies hysteresis + counter-based debounce to both sensors
-// ============================================================
 void Tasks::thresholdTask(void *pvParameters)
 {
     (void)pvParameters;
@@ -138,10 +134,8 @@ void Tasks::thresholdTask(void *pvParameters)
     }
 }
 
-// ============================================================
 //  Task 3: Display & Reporting (period: 500 ms)
 //  Prints structured report with sensor values and alerts
-// ============================================================
 void Tasks::displayTask(void *pvParameters)
 {
     (void)pvParameters;

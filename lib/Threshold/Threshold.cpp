@@ -14,7 +14,7 @@ void threshold_update(ThresholdMonitor *mon, float value)
     switch (mon->state)
     {
     case THRESHOLD_NORMAL:
-        // Check if value exceeds upper threshold
+        // The main idea is to prevent rapid toggling between states due to noise or transient conditions.
         if (value > mon->threshHigh) {
             mon->counter++;
             if (mon->counter >= mon->debounceLimit) {
@@ -27,7 +27,8 @@ void threshold_update(ThresholdMonitor *mon, float value)
         break;
 
     case THRESHOLD_ALERT:
-        // Check if value drops below lower threshold
+        // same but if the value drops below the lower threshold, we want to confirm that it's a sustained 
+        // drop before switching back to NORMAL.
         if (value < mon->threshLow) {
             mon->counter++;
             if (mon->counter >= mon->debounceLimit) {
