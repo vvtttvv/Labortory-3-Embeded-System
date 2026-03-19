@@ -15,6 +15,15 @@
 static ThresholdMonitor analogMon;
 static ThresholdMonitor digitalMon;
 static ConditioningState analogCondState;
+static uint32_t analogRiseStartMs = 0;
+static bool     analogRisePending = false;
+
+// Stack sizes are in bytes on AVR FreeRTOS (StackType_t is uint8_t).
+// Conditioning and Display need extra room due to float math and printf formatting.
+static const uint16_t STACK_ACQ    = 220;
+static const uint16_t STACK_COND   = 320;
+static const uint16_t STACK_THRESH = 220;
+static const uint16_t STACK_DISP   = 340;
 
 void Tasks::initHardware()
 {
@@ -27,16 +36,16 @@ void Tasks::initHardware()
 bool Tasks::createAll()
 {
     BaseType_t r1 = xTaskCreate(acquisitionTask,
-                                "Acq", 120, NULL, 3, NULL);
+                                "Acq", STACK_ACQ, NULL, 3, NULL);
 
     BaseType_t r2 = xTaskCreate(conditioningTask,
-                                "Cond", 110, NULL, 2, NULL);
+                                "Cond", STACK_COND, NULL, 2, NULL);
 
     BaseType_t r3 = xTaskCreate(thresholdTask,
-                                "Thresh", 110, NULL, 2, NULL);
+                                "Thresh", STACK_THRESH, NULL, 2, NULL);
 
     BaseType_t r4 = xTaskCreate(displayTask,
-                                "Disp", 150, NULL, 1, NULL);
+                                "Disp", STACK_DISP, NULL, 1, NULL);
 
     return (r1 == pdPASS && r2 == pdPASS && r3 == pdPASS && r4 == pdPASS);
 }
@@ -162,7 +171,28 @@ void Tasks::thresholdTask(void *pvParameters)
 
         // Run threshold state machines
         if (aValid) {
+            if (!analogRisePending && analogMon.state == THRESHOLD_NORMAL && aTemp > THRESH_HIGH) {
+                analogRiseStartMs = millis();
+                analogRisePending = true;
+            }
+
+            ThresholdState prev = analogMon.state;
             threshold_update(&analogMon, aTemp);
+
+            if (prev == THRESHOLD_NORMAL && analogMon.state == THRESHOLD_ALERT && analogRisePending) {
+                uint32_t dt = millis() - analogRiseStartMs;
+                if (xSemaphoreTake(dataMutex, pdMS_TO_TICKS(10)) == pdTRUE)
+                {
+                    alertData.analogLastRiseLatencyMs = (uint16_t)(dt > 0xFFFFUL ? 0xFFFFU : dt);
+                    alertData.analogLatencyValid = true;
+                    xSemaphoreGive(dataMutex);
+                }
+                analogRisePending = false;
+            }
+
+            if (analogMon.state == THRESHOLD_NORMAL && aTemp <= THRESH_HIGH) {
+                analogRisePending = false;
+            }
         }
         if (dValid) {
             threshold_update(&digitalMon, dTemp);
@@ -235,6 +265,15 @@ void Tasks::displayTask(void *pvParameters)
                  ad.analogState == THRESHOLD_ALERT
                      ? PSTR("ALERT!") : PSTR("NORMAL"),
                  ad.analogCounter, (uint8_t)DEBOUNCE_COUNT);
+
+        if (ad.analogLatencyValid)
+        {
+            printf_P(PSTR("[A-LAT] NORMAL->ALERT latency: %u ms\n"),
+                     ad.analogLastRiseLatencyMs);
+        }
+        else {
+            printf_P(PSTR("[A-LAT] Waiting for first NORMAL->ALERT transition...\n"));
+        }
 
         if (sd.digitalValid)
         {

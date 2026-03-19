@@ -4,7 +4,7 @@ SemaphoreHandle_t dataMutex = NULL;
 
 SensorData sensorData = { 0, 0.0f, false, 0.0f, 0.0f, false };
 ConditioningData conditioningData = { 0.0f, 0.0f, 0.0f, 0.0f, false };
-AlertData  alertData  = { THRESHOLD_NORMAL, 0, THRESHOLD_NORMAL, 0 };
+AlertData  alertData  = { THRESHOLD_NORMAL, 0, 0, false, THRESHOLD_NORMAL, 0 };
 
 void Signals_init()
 {

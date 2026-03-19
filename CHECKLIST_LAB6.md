@@ -11,7 +11,7 @@ Use this as a completion tracker for the full assignment.
 - [x] Debounce is implemented with configurable persistence count (`DEBOUNCE_COUNT`).
 - [x] Shared data protection is implemented with mutex.
 - [x] Structured serial reporting includes intermediate values and alert states.
-- [x] Build succeeds for `uno` in PlatformIO.
+- [x] Build succeeds for `mega2560` in PlatformIO.
 - [ ] End-to-end latency (<100 ms) is not yet measured and documented.
 - [ ] Formal test evidence matrix (requirement -> test -> result) is not yet documented.
 - [ ] Required architecture/behavior diagrams and HW schematic are not yet attached.

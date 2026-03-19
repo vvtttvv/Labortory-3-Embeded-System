@@ -13,7 +13,7 @@
 | R7 | Median filter stage | Inject salt-and-pepper spike | Median output rejects isolated spike | `Med:` field trend |
 | R8 | Weighted average stage | Apply step signal | `WMA` smooths response vs raw/median | `Raw/Med/WMA` comparison |
 | R9 | Task synchronization | Stress with concurrent updates | No corrupted/inconsistent report fields | Stable serial output |
-| R10 | Alert reaction latency < 100 ms | Apply threshold crossing and measure time to LED state change | Delay under 100 ms | Scope/video/time logs |
+| R10 | Alert reaction latency < 100 ms | Apply threshold crossing and record `[A-LAT] NORMAL->ALERT latency` from serial report | Delay under 100 ms | Serial log line `[A-LAT] ... ms` (+ optional scope/video) |
 
 ## Practical Test Procedure
 

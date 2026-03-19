@@ -34,7 +34,7 @@ graph TD
   L4[Application Layer: Tasks] --> L3[Service Layer: Threshold + Conditioning + Signals]
   L3 --> L2[ECAL Drivers: SensorAnalog, SensorDigital, UartStdio]
   L2 --> L1[HAL/MCAL: Arduino Core + FreeRTOS + AVR Peripherals]
-  L1 --> L0[Hardware: ATmega328P, NTC on A0, DHT11 on D7, LED D13]
+  L1 --> L0[Hardware: ATmega2560, NTC on A0, DHT11 on D7, LED D13]
 ```
 
 ## 4. Behavior Flow (Main Data Path)

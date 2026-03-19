@@ -1,6 +1,6 @@
 # Lab 6: Sensor Monitoring System with FreeRTOS
 
-This project implements a multi-tasking sensor monitoring system on an Arduino Uno using FreeRTOS. It demonstrates real-time data acquisition from analog and digital sensors, robust signal processing (saturation, median filter, weighted average, hysteresis, debouncing), and task synchronization.
+This project implements a multi-tasking sensor monitoring system on an Arduino Mega 2560 using FreeRTOS. It demonstrates real-time data acquisition from analog and digital sensors, robust signal processing (saturation, median filter, weighted average, hysteresis, debouncing), and task synchronization.
 
 ## Features
 
@@ -76,7 +76,7 @@ Lab6/
 
 1.  ** Prerequisites**:
     - VS Code with PlatformIO extension.
-    - Arduino Uno (or compatible AVR board).
+    - Arduino Mega 2560 (or compatible AVR board).
 
 2.  **Build & Upload**:
     - Open the project in PlatformIO.

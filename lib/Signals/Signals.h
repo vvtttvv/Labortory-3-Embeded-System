@@ -28,6 +28,8 @@ struct ConditioningData {
 struct AlertData {
     ThresholdState analogState;
     uint8_t        analogCounter;
+    uint16_t       analogLastRiseLatencyMs;
+    bool           analogLatencyValid;
     ThresholdState digitalState;
     uint8_t        digitalCounter;
 };
