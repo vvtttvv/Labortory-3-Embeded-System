@@ -3,6 +3,7 @@
 #include "Signals.h"
 #include "SensorAnalog.h"
 #include "SensorDigital.h"
+#include "Conditioning.h"
 #include "Threshold.h"
 #include "UartStdio.h"
 #include <Arduino.h>
@@ -13,6 +14,7 @@
 // Threshold monitors (local to threshold task)
 static ThresholdMonitor analogMon;
 static ThresholdMonitor digitalMon;
+static ConditioningState analogCondState;
 
 void Tasks::initHardware()
 {
@@ -25,15 +27,18 @@ void Tasks::initHardware()
 bool Tasks::createAll()
 {
     BaseType_t r1 = xTaskCreate(acquisitionTask,
-                                "Acq", 160, NULL, 3, NULL);
+                                "Acq", 120, NULL, 3, NULL);
 
-    BaseType_t r2 = xTaskCreate(thresholdTask,
-                                "Thresh", 128, NULL, 2, NULL);
+    BaseType_t r2 = xTaskCreate(conditioningTask,
+                                "Cond", 110, NULL, 2, NULL);
 
-    BaseType_t r3 = xTaskCreate(displayTask,
-                                "Disp", 200, NULL, 1, NULL);
+    BaseType_t r3 = xTaskCreate(thresholdTask,
+                                "Thresh", 110, NULL, 2, NULL);
 
-    return (r1 == pdPASS && r2 == pdPASS && r3 == pdPASS);
+    BaseType_t r4 = xTaskCreate(displayTask,
+                                "Disp", 150, NULL, 1, NULL);
+
+    return (r1 == pdPASS && r2 == pdPASS && r3 == pdPASS && r4 == pdPASS);
 }
 
 //  Task 1: Sensor Acquisition (period: 50 ms)
@@ -50,8 +55,9 @@ void Tasks::acquisitionTask(void *pvParameters)
     for (;;)
     {
         // Analog sensor (NTC thermistor) - every cycle
-        uint16_t raw  = SensorAnalog::readRaw();
+        uint16_t raw   = SensorAnalog::readRaw();
         float    tempC = SensorAnalog::rawToCelsius(raw);
+        bool     aOk   = (tempC > -200.0f);
 
         // Digital sensor (DHT11) - every ~2s
         float dhtTemp = 0.0f, dhtHum = 0.0f;
@@ -67,7 +73,8 @@ void Tasks::acquisitionTask(void *pvParameters)
         if (xSemaphoreTake(dataMutex, pdMS_TO_TICKS(10)) == pdTRUE)
         {
             sensorData.analogRaw  = raw;
-            sensorData.analogTemp = tempC;
+            sensorData.analogTempRaw = tempC;
+            sensorData.analogValid   = aOk;
 
             if (dhtOk) {
                 sensorData.digitalTemp     = dhtTemp;
@@ -82,7 +89,49 @@ void Tasks::acquisitionTask(void *pvParameters)
     }
 }
 
-//  Task 2: Threshold Alerting (period: 50 ms)
+//  Task 2: Signal Conditioning (period: 50 ms)
+//  Pipeline: raw -> saturation -> median -> weighted average
+void Tasks::conditioningTask(void *pvParameters)
+{
+    (void)pvParameters;
+    printf_P(PSTR("[CON] Conditioning task started\n"));
+
+    Conditioning::init(&analogCondState);
+    TickType_t xLastWake = xTaskGetTickCount();
+
+    for (;;)
+    {
+        float rawTemp = 0.0f;
+        bool  rawValid = false;
+
+        if (xSemaphoreTake(dataMutex, pdMS_TO_TICKS(10)) == pdTRUE)
+        {
+            rawTemp = sensorData.analogTempRaw;
+            rawValid = sensorData.analogValid;
+            xSemaphoreGive(dataMutex);
+        }
+
+        ConditioningSnapshot snap = { rawTemp, rawTemp, rawTemp, rawTemp, false };
+
+        if (rawValid) {
+            Conditioning::processSample(&analogCondState, rawTemp, &snap);
+        }
+
+        if (xSemaphoreTake(dataMutex, pdMS_TO_TICKS(10)) == pdTRUE)
+        {
+            conditioningData.raw = snap.raw;
+            conditioningData.saturated = snap.saturated;
+            conditioningData.median = snap.median;
+            conditioningData.weighted = snap.weighted;
+            conditioningData.valid = snap.valid;
+            xSemaphoreGive(dataMutex);
+        }
+
+        vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(CONDITIONING_PERIOD_MS));
+    }
+}
+
+//  Task 3: Threshold Alerting (period: 50 ms)
 //  Applies hysteresis + counter-based debounce to both sensors
 void Tasks::thresholdTask(void *pvParameters)
 {
@@ -98,19 +147,23 @@ void Tasks::thresholdTask(void *pvParameters)
     {
         float aTemp  = 0.0f;
         float dTemp  = 0.0f;
+        bool  aValid = false;
         bool  dValid = false;
 
         // Read latest sensor values (mutex-protected)
         if (xSemaphoreTake(dataMutex, pdMS_TO_TICKS(10)) == pdTRUE)
         {
-            aTemp  = sensorData.analogTemp;
+            aTemp  = conditioningData.weighted;
+            aValid = conditioningData.valid;
             dTemp  = sensorData.digitalTemp;
             dValid = sensorData.digitalValid;
             xSemaphoreGive(dataMutex);
         }
 
         // Run threshold state machines
-        threshold_update(&analogMon, aTemp);
+        if (aValid) {
+            threshold_update(&analogMon, aTemp);
+        }
         if (dValid) {
             threshold_update(&digitalMon, dTemp);
         }
@@ -134,7 +187,7 @@ void Tasks::thresholdTask(void *pvParameters)
     }
 }
 
-//  Task 3: Display & Reporting (period: 500 ms)
+//  Task 4: Display & Reporting (period: 500 ms)
 //  Prints structured report with sensor values and alerts
 void Tasks::displayTask(void *pvParameters)
 {
@@ -149,11 +202,13 @@ void Tasks::displayTask(void *pvParameters)
 
         // Snapshot shared data (mutex-protected)
         SensorData sd;
+        ConditioningData cd;
         AlertData  ad;
 
         if (xSemaphoreTake(dataMutex, pdMS_TO_TICKS(50)) == pdTRUE)
         {
             sd = sensorData;
+            cd = conditioningData;
             ad = alertData;
             xSemaphoreGive(dataMutex);
         }
@@ -162,15 +217,21 @@ void Tasks::displayTask(void *pvParameters)
             continue;
         }
 
-        // Format thermistor temperature (1 decimal place)
-        char tempBuf[8];
-        dtostrf(sd.analogTemp, 5, 1, tempBuf);
+        // Format thermistor intermediate pipeline values
+        char rawBuf[8], satBuf[8], medBuf[8], wmaBuf[8];
+        dtostrf(cd.raw, 5, 1, rawBuf);
+        dtostrf(cd.saturated, 5, 1, satBuf);
+        dtostrf(cd.median, 5, 1, medBuf);
+        dtostrf(cd.weighted, 5, 1, wmaBuf);
 
         // Print structured report
         printf_P(PSTR("======= SENSOR REPORT =======\n"));
 
-        printf_P(PSTR("[THERM] Raw:%4u | Temp:%s C | %S (%u/%u)\n"),
-                 sd.analogRaw, tempBuf,
+        printf_P(PSTR("[THERM] ADC:%4u | Raw:%s C | Sat:%s C | Med:%s C | WMA:%s C | Valid:%c\n"),
+                 sd.analogRaw, rawBuf, satBuf, medBuf, wmaBuf,
+                 cd.valid ? 'Y' : 'N');
+
+        printf_P(PSTR("[A-THR] State:%S (%u/%u)\n"),
                  ad.analogState == THRESHOLD_ALERT
                      ? PSTR("ALERT!") : PSTR("NORMAL"),
                  ad.analogCounter, (uint8_t)DEBOUNCE_COUNT);

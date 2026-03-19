@@ -14,7 +14,17 @@
 #define THRESH_LOW        24.0f  // Alert deactivates below this (C)
 #define DEBOUNCE_COUNT    5      // Consecutive readings to confirm state change
 
+#define COND_SAT_MIN_C    -20.0f
+#define COND_SAT_MAX_C    80.0f
+#define COND_WINDOW_SIZE  5
+#define COND_WEIGHT_0     1
+#define COND_WEIGHT_1     2
+#define COND_WEIGHT_2     3
+#define COND_WEIGHT_3     4
+#define COND_WEIGHT_4     5
+
 #define ACQUISITION_PERIOD_MS   50    // Sensor read rate (20-100 ms)
+#define CONDITIONING_PERIOD_MS  50    // Signal conditioning rate
 #define THRESHOLD_PERIOD_MS     50    // Threshold check rate
 #define DISPLAY_PERIOD_MS       500   // Serial report rate
 #define DHT_READ_INTERVAL_MS    2000  // DHT11 min sampling interval
