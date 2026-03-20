@@ -1,6 +1,7 @@
 #include "Conditioning.h"
 #include "Config.h"
 
+// clampValue I use for saturation, it helps to keep the raw value within the expected range
 static float clampValue(float v, float lo, float hi)
 {
     if (v < lo) return lo;
@@ -8,6 +9,7 @@ static float clampValue(float v, float lo, float hi)
     return v;
 }
 
+// To avoid the median impuls noise affecting the weighted average too much
 static float medianOfWindow(const float *buf, uint8_t count)
 {
     float tmp[5];
@@ -37,6 +39,7 @@ static float medianOfWindow(const float *buf, uint8_t count)
     return tmp[count / 2U];
 }
 
+// to make the result smoother
 static float weightedAverage(const ConditioningState *state)
 {
     static const uint8_t weights[5] = {
@@ -85,6 +88,7 @@ void Conditioning::init(ConditioningState *state)
     state->sampleCount = 0;
 }
 
+// aw -> sat -> median -> weighted
 void Conditioning::processSample(ConditioningState *state, float rawValue, ConditioningSnapshot *out)
 {
     out->raw = rawValue;

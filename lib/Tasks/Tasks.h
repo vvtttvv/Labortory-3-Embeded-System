@@ -8,11 +8,10 @@ namespace Tasks
     void initHardware();
     bool createAll();
 
-    // FreeRTOS task functions
-    void acquisitionTask(void *pvParameters);   // Sensor reading
+    void acquisitionTask(void *pvParameters);
     void conditioningTask(void *pvParameters);  // Saturation + median + weighted average
-    void thresholdTask(void *pvParameters);      // Hysteresis + debounce
-    void displayTask(void *pvParameters);        // Serial reporting
+    void thresholdTask(void *pvParameters);  
+    void displayTask(void *pvParameters);      
 }
 
 #endif

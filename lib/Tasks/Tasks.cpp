@@ -11,15 +11,13 @@
 #include <semphr.h>
 #include <stdlib.h>
 
-// Threshold monitors (local to threshold task)
+// Threshold monitors
 static ThresholdMonitor analogMon;
 static ThresholdMonitor digitalMon;
 static ConditioningState analogCondState;
 static uint32_t analogRiseStartMs = 0;
 static bool     analogRisePending = false;
 
-// Stack sizes are in bytes on AVR FreeRTOS (StackType_t is uint8_t).
-// Conditioning and Display need extra room due to float math and printf formatting.
 static const uint16_t STACK_ACQ    = 220;
 static const uint16_t STACK_COND   = 320;
 static const uint16_t STACK_THRESH = 220;
